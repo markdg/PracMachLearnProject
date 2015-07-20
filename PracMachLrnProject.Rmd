@@ -1,19 +1,19 @@
 ---
 title: "Practical Machine Learning Project"
 author: "Mark George"
-date: "07/15/2015"
+date: "07/20/2015"
 output: html_document
 ---
 
 ## Executive Summary
 
-The Coursera Practical Machine Learning course project ...
+The Coursera Practical Machine Learning course project goal is to predict the manner in which participants performed the exercise in the Weight Lifting Exercise study (see http://groupware.les.inf.puc-rio.br/har) based on data that was collected. Six participants did barbell lifts correctly and incorrectly in five different ways. Data was captured from accelerometers on the belt, forearm, and arm.
 
-Training and testing data sets were downloaded from the Coursera course site repository. Examination of the data sets revealed that many variables contained a large number of NA's and missing values. These variables were dropped from the data sets. Other variables were studied with consideration of their usefulness in prediction and dropped if appropriate. The training set was partitioned into two sets for training and cross validation. 
+Training and testing data sets were downloaded from the Coursera course repository. Examination of the data sets revealed that many variables contained a large number of NA's and missing values. These variables were dropped from the data sets. Other variables were studied with consideration of their usefulness in prediction and dropped if appropriate. The cleaned training set was partitioned into two sets for training and cross validation. 
 
-An initial false start came from including the X variable which resulted in near perfect accuracy on the training and testing cross validation sets, but caused the model to predict all A's on the actual testing set.
+An initial false start came from failure to remove the X variable which resulted in near perfect accuracy on the training and testing cross validation sets, but caused the model to predict all A's on the actual testing set.
 
-Using the cleaned testing and training cross validation sets several models were fitted. An LDA model yielded accuracy of 0.7381. A CART model yielded an accuracy of 0.5011. Attempts to fit a boosting model caused the computer to crash. Finally, a random forest model was successfully fitted and demonstrated an accuracy of 0.9925 on the cross validation set. Due to its high accuracy the other models were discarded and the random forest model used for prediction on the final testing set. The predicted answers scored 100% upon submission to the Coursera site.
+Using the cleaned testing and training cross validation sets several models were fitted. Out-of-sample error was estimated by generating a confusion matrix for each model on the cross validation test set. An LDA model yielded accuracy of 0.7345. A CART model yielded accuracy of 0.4936. Attempts to fit a boosting model caused the computer to crash, probably due to insufficient resources. Finally, a random forest model was successfully fitted and demonstrated an accuracy of 0.9971 on the cross validation set. Due to its high accuracy the other models were discarded and the random forest model used for prediction on the final testing set. The predicted answers scored 100% upon submission to the Coursera site.
 
 ## Data Download and Exploration
 
@@ -44,12 +44,12 @@ if (file.exists("pml-testing.csv")) {
 
 Take a look at the data sets.
 
-```{r}
+```{r Examine training and testing sets}
 dim(training); dim(testing)
-summary(training)
+# summary(training)
 ```
 
-Training data set is 19,622 rows of 160 variables. Testing data set is 20 rows of 160 variables.
+Examining the summary (suppressed during creation of this report) we see that the training data set is 19,622 rows of 160 variables. Testing data set is 20 rows of 160 variables.
 
 The training data set has many missing values and NA's. The problem variables always show 19216 of them missing or NA. I believe these variables should be dropped from the data set.
 
@@ -57,42 +57,43 @@ The training data set has many missing values and NA's. The problem variables al
 
 Drop columns with large number of NA's.
 
-```{r}
+```{r Remove columns with NAs}
 naCols <- names(training[, colSums(is.na(training))==19216])
 trainClean <- training[, -which(names(training) %in% naCols)]
 testClean <- testing[, -which(names(testing) %in% naCols)]
 dim(trainClean); dim(testClean)
-summary(trainClean)
+# summary(trainClean)
 ```
 
 Many variables have 19216 empty entries. That number is related to a variable called new_window which I don't understand. I remove the columns with empyt entries.
 
-```{r}
+```{r Remove mostly empty columns}
 emptyCols <- c("kurtosis_roll_belt", "kurtosis_picth_belt", "kurtosis_yaw_belt", "kurtosis_roll_forearm", "kurtosis_picth_forearm", "kurtosis_yaw_forearm", "skewness_roll_forearm", "skewness_pitch_forearm", "skewness_yaw_forearm", "max_yaw_forearm", "min_yaw_forearm", "amplitude_yaw_forearm", "amplitude_yaw_belt", "skewness_roll_belt", "skewness_roll_belt.1", "skewness_yaw_belt", "max_yaw_belt", "in_yaw_belt", "kurtosis_roll_dumbbell", "kurtosis_picth_dumbbell", "kurtosis_yaw_dumbbell", "skewness_roll_dumbbell", "skewness_pitch_dumbbell", "skewness_yaw_dumbbell", "max_yaw_dumbbell", "min_yaw_dumbbell", "amplitude_yaw_dumbbell", "kurtosis_roll_arm", "kurtosis_picth_arm", "kurtosis_yaw_arm", "skewness_roll_arm", "skewness_pitch_arm", "skewness_yaw_arm", "min_yaw_belt")
 trainClean <- trainClean[, -which(names(trainClean) %in% emptyCols)]
 testClean <- testClean[, -which(names(testClean) %in% emptyCols)]
 dim(trainClean); dim(testClean)
-summary(trainClean)
+# summary(trainClean)
 ```
 
 Remove some other columns that should not be used to predict the activity class.
 
-```{r}
+```{r Remove other columns}
 otherCols <- c("new_window", "num_window", "raw_timestamp_part_1", "raw_timestamp_part_2", "cvtd_timestamp", "X")
 # Note that before I removed the X variable the lda model was getting perfect accuracy and the prediction on the cross validation set was predicting all A's. So obviously some issue.
 # "user_name" was initially removed but later left in.
 trainClean <- trainClean[, -which(names(trainClean) %in% otherCols)]
 testClean <- testClean[, -which(names(testClean) %in% otherCols)]
 dim(trainClean); dim(testClean)
-summary(trainClean)
+# summary(trainClean)
 ```
 
 ## Preprocessing
 
 Create cross validation sets using the caret package.
 
-```{r}
+```{r Create cross validation sets}
 library(caret)
+set.seed(3677)
 inTrain <- createDataPartition(y=trainClean$classe, p=0.6, list=FALSE)
 trainCV <- trainClean[inTrain,]
 testCV <- trainClean[-inTrain,]
@@ -102,7 +103,7 @@ testCV <- trainClean[-inTrain,]
 
 Train and evaluate an lda model.
 
-```{r}
+```{r Fit LDA model}
 if (file.exists("ldaModCV.rds")) {
     ldaModCV <- readRDS("ldaModCV.rds")
 } else {
@@ -112,27 +113,32 @@ if (file.exists("ldaModCV.rds")) {
 confusionMatrix(predict(ldaModCV, testCV), testCV$classe)
 ```
 
-Accuracy is 0.7381 which is not very impressive. Perhaps if I have several different types of models I can create an ensemble prediction with better accuracy.
+Accuracy is 0.7345 which is not very impressive. Perhaps if I have several different types of models I can create an ensemble prediction with better accuracy.
 
 ## CART
 
-```{r}
-cartModCV <- train(classe ~ ., data=trainCV, method="rpart")
+```{r Fit CART model}
+if (file.exists("cartModCV.rds")) {
+    cartModCV <- readRDS("cartModCV.rds")
+} else {
+    cartModCV <- train(classe ~ ., data=trainCV, method="rpart")
+    saveRDS(cartModCV, file="cartModCV.rds")
+}
 confusionMatrix(predict(cartModCV, testCV), testCV$classe)
 ```
 
-Accuracy for CART is only 0.5011, pretty poor, and unlikely to provide any help to an ensemble approach. I'm going to need some better accuracy.
+Accuracy for CART is only 0.4936, pretty poor, and unlikely to provide any help to an ensemble approach. I'm going to need some better accuracy.
 
 ## Boosting
 
-```{r}
+```{r Fit boosting model}
 #boostMod <- train(classe ~ ., data=trainCV, method="gbm", verbose=FALSE)
 ```
 R crashes when attempting to run this. My computer probably doesn't have enough resources. Perhaps another model type will complete without crashing.
 
 ## Random Forest
 
-```{r}
+```{r Fit random forest model}
 if (file.exists("rfModCV.rds")) {
     rfModCV <- readRDS("rfModCV.rds")
 } else {
@@ -142,13 +148,13 @@ if (file.exists("rfModCV.rds")) {
 confusionMatrix(predict(rfModCV, testCV), testCV$classe)
 ```
 
-It took a little over 3 hours to fit the model on my sad little Celeron-based laptop with 2GB of memory. But it was worth it. Accuracy on the cross validation set is 0.9925.
+It took a little over 3 hours to fit the model on my sad little Celeron-based laptop with 2GB of memory. But it was worth it. Accuracy on the cross validation set is 0.9971.
 
 ## Prediction on Testing Set
 
 Now predict the exercise class on the final testing set.
 
-```{r}
+```{r Predict responses on testing set}
 answers <- list()
 for (i in 1:20) {
     answers[i] <- as.character(predict(rfModCV, testClean[i, -54]))
