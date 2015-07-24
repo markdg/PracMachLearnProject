@@ -286,7 +286,12 @@ confusionMatrix(predict(rfModCV, testCV), testCV$classe)</code></pre>
 for (i in 1:20) {
     answers[i] &lt;- as.character(predict(rfModCV, testClean[i, -54]))
 }
-save(answers, file=&quot;answers.txt&quot;, ascii=TRUE)</code></pre>
+save(answers, file=&quot;answers.txt&quot;, ascii=TRUE)
+print(&quot;Answers:&quot;)</code></pre>
+<pre><code>## [1] &quot;Answers:&quot;</code></pre>
+<pre class="r"><code>unlist(answers)</code></pre>
+<pre><code>##  [1] &quot;B&quot; &quot;A&quot; &quot;B&quot; &quot;A&quot; &quot;A&quot; &quot;E&quot; &quot;D&quot; &quot;B&quot; &quot;A&quot; &quot;A&quot; &quot;B&quot; &quot;C&quot; &quot;B&quot; &quot;A&quot; &quot;E&quot; &quot;E&quot; &quot;A&quot;
+## [18] &quot;B&quot; &quot;B&quot; &quot;B&quot;</code></pre>
 <p>Answers were submitted and resulted in 100% correct score.</p>
 <p>Conclusion is that the random forest model as fitted had sufficiently accurate prediction capability.</p>
 </div>
